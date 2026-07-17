@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.skill-enhance/
+enhanced-*/
+.DS_Store
+coverage/
+.vitest-cache/
