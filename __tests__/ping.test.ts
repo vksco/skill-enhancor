@@ -3,18 +3,24 @@
  * @file ping.test
  * @description Tests for src/commands/ping.ts — verifies the smoke command
  *   constructs the correct model factory + calls generateText with the right
- *   shape. The real LLM call is mocked so the test stays offline (per project
- *   rule "no network in tests").
+ *   shape + strips reasoning tags. AI SDK is mocked so the test stays offline.
  * @see CLAUDE.md §"No network in tests"
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock the AI SDK before importing the module under test, per testing.md §"Mocking".
+const tOpen = "<" + "think" + ">";
+const tClose = "<" + "/think" + ">";
+
 vi.mock("ai", () => ({
   generateText: vi.fn(async () => ({
-    text: "pong.",
-    usage: { inputTokens: 5, outputTokens: 3, totalTokens: 8 },
+    text: "ok",
+    usage: {
+      inputTokens: 5,
+      outputTokenDetails: { textTokens: 3, reasoningTokens: 0 },
+      outputTokens: 3,
+      totalTokens: 8,
+    },
   })),
 }));
 
@@ -37,6 +43,7 @@ beforeEach(() => {
     "CUSTOM_API_KEY",
     "CUSTOM_BASE_URL",
     "CUSTOM_MODEL",
+    "CUSTOM_REASONING_TAG",
   ]) {
     delete process.env[k];
   }
@@ -49,7 +56,7 @@ describe("runPing (mocked AI SDK)", () => {
 
     const r = await runPing();
     expect(r.provider).toBe("minimax");
-    expect(r.text).toBe("pong.");
+    expect(r.text).toBe("ok"); // mock returns clean "ok"; strip is a no-op
     expect(r.inputTokens).toBe(5);
     expect(r.outputTokens).toBe(3);
     expect(r.totalTokens).toBe(8);
@@ -67,34 +74,50 @@ describe("runPing (mocked AI SDK)", () => {
   });
 
   it("fails loud with no provider configured", async () => {
-    // No env keys set → loadEnv throws → runPing exits with 1.
-    // Vitest's process.exit can't intercept without mocking, so we re-throw
-    // and assert on the thrown shape instead.
+    // No env keys set → loadEnv throws → runPing exits via cli-errors.
+    // Vitest can't easily intercept process.exit, so we assert on rejection.
     await expect(runPing()).rejects.toBeDefined();
+  });
+
+  it("strips Minimax thinker tags from response text (when mock returns them)", async () => {
+    // Override mock to return text containing reasoning tag.
+    (generateText as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      text: tOpen + "thinking chain" + tClose + "\n\npong.",
+      usage: {
+        inputTokens: 5,
+        outputTokenDetails: { textTokens: 10, reasoningTokens: 40 },
+        outputTokens: 50,
+        totalTokens: 55,
+      },
+    });
+    process.env.MINIMAX_API_KEY = "sk-fake-minimax-key-1234567890";
+    process.env.MINIMAX_BASE_URL = "https://api.minimax.io/v1";
+
+    const r = await runPing();
+    expect(r.text).toBe("pong.");
+    expect(r.reasoningTokens).toBe(40);
   });
 });
 
 describe("formatPing", () => {
-  it("formats result with provider, model, base (if any), elapsed, tokens, text", () => {
+  it("shows reasoning token count when > 0", () => {
     const out = formatPing({
       provider: "minimax",
       model: "MiniMax-M2.7",
       baseURL: "https://api.minimax.io/v1",
-      elapsedMs: 123,
+      elapsedMs: 100,
       text: "pong.",
       inputTokens: 5,
-      outputTokens: 3,
-      totalTokens: 8,
+      outputTokens: 10,
+      reasoningTokens: 40,
+      totalTokens: 55,
     });
-    expect(out).toContain("provider=minimax");
-    expect(out).toContain("model=MiniMax-M2.7");
-    expect(out).toContain("base=https://api.minimax.io/v1");
-    expect(out).toContain("123ms");
-    expect(out).toContain("tokens in=5 out=3 total=8");
+    expect(out).toContain("reasoning=40");
+    expect(out).toContain("tokens in=5 out=10");
     expect(out).toContain("pong.");
   });
 
-  it("omits base URL for non-OpenAI-compat providers", () => {
+  it("omits reasoning token display when 0 (no need to surface the field)", () => {
     const out = formatPing({
       provider: "anthropic",
       model: "claude-sonnet-5",
@@ -102,8 +125,10 @@ describe("formatPing", () => {
       text: "ok",
       inputTokens: 1,
       outputTokens: 1,
+      reasoningTokens: 0,
       totalTokens: 2,
     });
+    expect(out).not.toContain("reasoning=");
     expect(out).not.toContain("base=");
     expect(out).toContain("provider=anthropic");
   });

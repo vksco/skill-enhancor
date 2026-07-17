@@ -10,7 +10,11 @@
 
 import { generateText } from "ai";
 import { loadEnv } from "../env.js";
-import { makeModel, type ProviderId } from "../providers/registry.js";
+import {
+  makeModel,
+  stripThinking,
+  type ProviderId,
+} from "../providers/registry.js";
 import { exitUserError, exitInternalError } from "../cli-errors.js";
 
 export interface PingResult {
@@ -19,6 +23,7 @@ export interface PingResult {
   baseURL?: string;
   elapsedMs: number;
   text: string;
+  reasoningTokens: number;
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
@@ -28,9 +33,13 @@ export interface PingResult {
  * Run the smoke test. Returns the result object so the caller (cli / tests)
  * can format it. Throws on failure via cli-errors.
  *
+ * Strips reasoning tags from the response text per the provider's registered
+ * pattern (so `think` from Minimax doesn't pollute the displayed output).
+ * Cost is already tracked separately in `usage.reasoningTokens`.
+ *
  * @param opts.provider - Optional explicit provider override.
  * @param opts.prompt   - Prompt text. Short by default.
- * @returns PingResult with timing + token usage.
+ * @returns PingResult with timing + token usage + cleaned text.
  */
 export async function runPing(opts: { provider?: string; prompt?: string } = {}): Promise<PingResult> {
   let env;
@@ -48,19 +57,30 @@ export async function runPing(opts: { provider?: string; prompt?: string } = {})
     result = await generateText({
       model: makeModel(env.provider, env.model, env.apiKey, env.baseURL),
       prompt,
-      maxOutputTokens: 50,
+      // Reasoning models (e.g., Minimax M2.7) spend most output tokens on
+      // internal chain-of-thought. 200 leaves room for thinking + a short
+      // final answer. Phase 3+ judge/mutation paths will need their own
+      // larger budgets tuned to expected content size.
+      maxOutputTokens: 200,
     });
   } catch (err) {
     exitInternalError(err);
   }
   const elapsed = Date.now() - start;
 
+  const cleanedText = stripThinking(result.text, env.provider);
+
+  // reasoningTokens lives at usage.outputTokenDetails.reasoningTokens in AI SDK v7
+  // (verified via direct .d.ts read on 2026-07-18).
+  const reasoningTokens = result.usage?.outputTokenDetails?.reasoningTokens ?? 0;
+
   return {
     provider: env.provider,
     model: env.model,
     baseURL: env.baseURL,
     elapsedMs: elapsed,
-    text: result.text.trim(),
+    text: cleanedText,
+    reasoningTokens,
     inputTokens: result.usage?.inputTokens ?? 0,
     outputTokens: result.usage?.outputTokens ?? 0,
     totalTokens: result.usage?.totalTokens ?? 0,
@@ -70,9 +90,10 @@ export async function runPing(opts: { provider?: string; prompt?: string } = {})
 /** Human-readable one-liner formatter used by `skillenhance ping` CLI output. */
 export function formatPing(r: PingResult): string {
   const base = r.baseURL ? ` base=${r.baseURL}` : "";
+  const reasoning = r.reasoningTokens > 0 ? ` reasoning=${r.reasoningTokens}` : "";
   return (
     `[ping] provider=${r.provider} model=${r.model}${base}\n` +
-    `[ping] ok in ${r.elapsedMs}ms — tokens in=${r.inputTokens} out=${r.outputTokens} total=${r.totalTokens}\n` +
+    `[ping] ok in ${r.elapsedMs}ms — tokens in=${r.inputTokens} out=${r.outputTokens}${reasoning} total=${r.totalTokens}\n` +
     `[ping] ${r.text}`
   );
 }
