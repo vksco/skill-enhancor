@@ -244,6 +244,7 @@ skillenhance --version
 |---|---|---|
 | 0. **Project rules applied** | ✅ | `CLAUDE.md` (index) + 10 `.claude/rules/*.md` files + `src/env.ts` env loader + `__tests__/` at root + vitest wired + author signatures + 16/16 unit tests green |
 | 1. **Spike** | ✅ | TS scaffold + Vercel AI SDK + auto-detect minimax provider; round-trip 4978ms / 260 tokens via real model |
+| 2. **Provider registry + config UI + ping** | ✅ | `src/providers/registry.ts` (single source of truth for 5 providers), `src/cli.ts` (node:util.parseArgs router), `src/commands/ping.ts` (smoke test), `src/commands/config.ts` (interactive wizard using @inquirer/prompts, lazy-loaded), `src/config.ts` (.env read/write helper), `src/cli-errors.ts` (exit code helpers per project rules); 33 new tests across 5 new files; `skillenhance --help`, `skillenhance ping`, `skillenhance config` all working end-to-end (real call 2505ms / 100 tokens verified) |
 | 1. Spike | 1 | TS scaffold + `@ai-sdk/openai-compatible` round-trip on fixture |
 | 2. Provider registry + config UI | 1 | `skillenhance config` works; chosen provider produces 1 sample completion |
 | 3. Rubric + judge | 1 | 5-axis scoring with real cases; cross-model sanity check |

@@ -13,13 +13,15 @@
     "spike": "tsx src/spike.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "skillenhance": "node --import tsx src/cli.ts"
   },
   "dependencies": {
     "ai": "^7.0.31",
     "@ai-sdk/anthropic": "^4.0.16",
     "@ai-sdk/openai": "^4.0.16",
     "@ai-sdk/openai-compatible": "^3.0.12",
+    "@inquirer/prompts": "^8.5.2",
     "dotenv": "^17.4.2",
     "zod": "^3.23.8"
   },
