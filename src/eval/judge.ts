@@ -27,19 +27,23 @@ import { buildJudgePrompt } from "../prompts/judge.js";
 import { exitUserError, exitInternalError } from "../cli-errors.js";
 import { buildAggregate } from "./rubric.js";
 import { fingerprintCases } from "./cases-io.js";
+import { DIMENSION_IDS } from "./dimensions.js";
 import type { Case, JudgeOutput, ScoreAggregate } from "./types.js";
 
-/** Per-case schema (Zod for runtime validation of parsed JSON). */
+/**
+ * Per-case Zod schema. `scores` is built dynamically from DIMENSION_IDS so
+ * adding a dimension updates the validation shape automatically.
+ */
+const scoresSchema = z.object(
+  Object.fromEntries(
+    DIMENSION_IDS.map((id) => [id, z.number().min(0).max(10)]),
+  ) as Record<(typeof DIMENSION_IDS)[number], z.ZodNumber>,
+);
+
 const evalSchema = z.object({
   case_id: z.string(),
   did_trigger: z.boolean(),
-  scores: z.object({
-    correctness: z.number().min(0).max(10),
-    triggerFidelity: z.number().min(0).max(10),
-    outputQuality: z.number().min(0).max(10),
-    robustness: z.number().min(0).max(10),
-    reusability: z.number().min(0).max(10),
-  }),
+  scores: scoresSchema,
   rationale: z.string().min(1),
 });
 

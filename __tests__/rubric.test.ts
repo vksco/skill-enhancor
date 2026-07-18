@@ -165,5 +165,8 @@ describe("describeAggregate()", () => {
     expect(out).toContain("reuse=10.0");
     expect(out).toContain("cases=7");
     expect(out).toContain("sha=abcdef12");
+    // Weights are NOT shown (config, not result).
+    expect(out).not.toContain("wc=");
+    expect(out).not.toContain("wt=");
   });
 });

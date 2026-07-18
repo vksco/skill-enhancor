@@ -1,29 +1,15 @@
 /**
  * @author Vikash Sharma <vikashsharma2039@gmail.com>
  * @file types
- * @description Shared types for evaluation: rubric axes, scores, cases.
- *   Used by rubric.ts, judge.ts, cases-io.ts, and Phase 4 iteration loop.
- * @see SPEC.md §"Locked Decisions Q2 (rubric)", §"Architecture → eval"
+ * @description Shared types for evaluation. AxisScore is derived from the
+ *   dimension registry — adding a dimension there updates the type here.
+ * @see src/eval/dimensions.ts (source of truth), SPEC.md §"Locked Decisions Q2"
  */
 
-/** The five rubric axes the iteration loop optimizes. */
-export const AXIS_IDS = [
-  "correctness",
-  "triggerFidelity",
-  "outputQuality",
-  "robustness",
-  "reusability",
-] as const;
-export type AxisId = (typeof AXIS_IDS)[number];
+import type { DimensionId } from "./dimensions.js";
 
-/** Score for one axis, integer 0–10. */
-export interface AxisScore {
-  correctness: number;
-  triggerFidelity: number;
-  outputQuality: number;
-  robustness: number;
-  reusability: number;
-}
+/** Per-axis score, 0–10 each. Field set mirrors the dimension registry. */
+export type AxisScore = Record<DimensionId, number>;
 
 /** A single test case the iteration loop evaluates the skill against. */
 export interface Case {
@@ -52,7 +38,7 @@ export interface CaseEvaluation {
   case_id: string;
   /** What the judge thinks would happen — true = skill would trigger on this case. */
   did_trigger: boolean;
-  /** 0–10 scores across all 5 axes for this specific case. */
+  /** 0–10 scores across all axes for this specific case. */
   scores: AxisScore;
   /** Short rationale (1–3 sentences). */
   rationale: string;
