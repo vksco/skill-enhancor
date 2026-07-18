@@ -1,0 +1,22 @@
+{
+  "queries": [
+    {
+      "id": "anti-1",
+      "input": "test query that should trigger",
+      "should_trigger": true,
+      "kind": "positive"
+    },
+    {
+      "id": "anti-2",
+      "input": "refactor this",
+      "should_trigger": false,
+      "kind": "negative"
+    },
+    {
+      "id": "edge-1",
+      "input": "summarize the algorithm in 1 sentence",
+      "should_trigger": true,
+      "kind": "positive_edge"
+    }
+  ]
+}

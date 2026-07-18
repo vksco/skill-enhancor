@@ -10,3 +10,4 @@ coverage/
 .vitest-cache/
 # Graphify outputs (per /graphify command)
 graphify-out/
+.smoke-*/
