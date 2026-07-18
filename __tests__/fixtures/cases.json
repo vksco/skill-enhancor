@@ -1,0 +1,35 @@
+{
+  "queries": [
+    {
+      "id": "trigger-1",
+      "input": "summarize this function",
+      "should_trigger": true,
+      "kind": "positive",
+      "expected": "1-3 sentence plain-English summary"
+    },
+    {
+      "id": "trigger-2",
+      "input": "what does this code do?",
+      "should_trigger": true,
+      "kind": "positive"
+    },
+    {
+      "id": "anti-1",
+      "input": "refactor this code for readability",
+      "should_trigger": false,
+      "kind": "negative"
+    },
+    {
+      "id": "edge-1",
+      "input": "summarize this in 100 words",
+      "should_trigger": true,
+      "kind": "positive_edge"
+    },
+    {
+      "id": "edge-2",
+      "input": "explain the algorithm",
+      "should_trigger": false,
+      "kind": "negative_edge"
+    }
+  ]
+}

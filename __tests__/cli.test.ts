@@ -40,4 +40,12 @@ describe("parseCliArgs", () => {
   it("rejects unknown flags", () => {
     expect(() => parseCliArgs(["--nope"])).toThrow();
   });
+
+  it("captures --skill, --cases, --model path", () => {
+    const r = parseCliArgs(["judge", "./x.md", "--cases", "./c.json", "--model", "claude-opus"]);
+    expect(r.command).toBe("judge");
+    expect(r.positional1).toBe("./x.md");
+    expect(r.cases).toBe("./c.json");
+    expect(r.model).toBe("claude-opus");
+  });
 });
