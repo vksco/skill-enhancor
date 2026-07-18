@@ -18,8 +18,16 @@ function runCli(args: string[]): Promise<{
   exitCode: number;
 }> {
   return new Promise((resolveRun, rejectRun) => {
+    // Strip VITEST* env so the child's auto-exec guard does NOT skip
+    // runCli (it treats VITEST=true as "I'm in a worker, don't fire").
+    // Without this, all e2e tests were silently passing with exit 0
+    // because the CLI never actually ran in the spawned child.
+    const env = { ...process.env };
+    for (const k of ["VITEST", "VITEST_WORKER_ID", "VITEST_POOL_ID"]) {
+      delete env[k];
+    }
     const child = spawn(process.execPath, ["--import", "tsx", CLI_ENTRY, ...args], {
-      env: process.env,
+      env,
       stdio: ["ignore", "pipe", "pipe"],
       shell: false,
     });

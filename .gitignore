@@ -8,3 +8,5 @@ enhanced-*/
 .DS_Store
 coverage/
 .vitest-cache/
+# Graphify outputs (per /graphify command)
+graphify-out/

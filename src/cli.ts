@@ -103,6 +103,11 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
 /**
  * Top-level CLI router. Exits with 0 on success; delegates error exits to
  * `cli-errors.ts` helpers. Never returns on success (exits 0).
+ *
+ * Note on control flow: every successful command path returns from runCli
+ * explicitly (in addition to process.exit) so this function is safe to
+ * call from tests with process.exit mocked. process.exit is defense in
+ * depth — relying solely on it would break under mock injection.
  */
 export async function runCli(argv: readonly string[] = process.argv.slice(2)): Promise<void> {
   let args: CliArgs;
@@ -115,64 +120,82 @@ export async function runCli(argv: readonly string[] = process.argv.slice(2)): P
   if (args.version) {
     console.log(VERSION);
     process.exit(0);
+    return;
   }
 
-  const command = args.command ?? (args.help ? "help" : "help");
+  const command = args.command ?? "help";
 
-  switch (command) {
-    case "help":
-      console.log(HELP);
-      process.exit(0);
+  if (command === "help") {
+    console.log(HELP);
+    process.exit(0);
+    return;
+  }
 
-    case "ping": {
-      const r = await runPing({ provider: args.provider });
-      console.log(formatPing(r));
-      process.exit(0);
-    }
+  if (command === "ping") {
+    const r = await runPing({ provider: args.provider });
+    console.log(formatPing(r));
+    process.exit(0);
+    return;
+  }
 
-    case "config":
-      await runConfigWizard();
-      process.exit(0);
+  if (command === "config") {
+    await runConfigWizard();
+    process.exit(0);
+    return;
+  }
 
-    case "judge": {
-      const skillPath = args.positional1 ?? args.skill;
-      const casesPath = args.cases;
-      if (!skillPath) {
-        exitUserError(
-          'judge: missing skill path. Usage: skillenhance judge <SKILL> --cases <JSON>',
-        );
-      }
-      if (!casesPath) {
-        exitUserError(
-          'judge: missing --cases path. Usage: skillenhance judge <SKILL> --cases <JSON>',
-        );
-      }
-      try {
-        const result = await runJudgeCli({
-          skillPath,
-          casesPath,
-          provider: args.provider,
-          modelId: args.model,
-        });
-        console.log(formatJudgeOutput(result));
-        process.exit(0);
-      } catch (err) {
-        exitInternalError(err);
-      }
-      break;
-    }
-
-    default:
+  if (command === "judge") {
+    const skillPath = args.positional1 ?? args.skill;
+    const casesPath = args.cases;
+    if (!skillPath) {
       exitUserError(
-        `Unknown command: "${command}".`,
-        "Run `skillenhance --help` for the supported command list.",
+        'judge: missing skill path. Usage: skillenhance judge <SKILL> --cases <JSON>',
       );
+      return;
+    }
+    if (!casesPath) {
+      exitUserError(
+        'judge: missing --cases path. Usage: skillenhance judge <SKILL> --cases <JSON>',
+      );
+      return;
+    }
+    try {
+      const result = await runJudgeCli({
+        skillPath,
+        casesPath,
+        provider: args.provider,
+        modelId: args.model,
+      });
+      console.log(formatJudgeOutput(result));
+      process.exit(0);
+      return;
+    } catch (err) {
+      // File-not-found (ENOENT) on user-supplied paths is a user error,
+      // not a bug. Surface as exit 1 with a helpful message. Everything
+      // else gets the standard internal-error treatment.
+      const code = (err as NodeJS.ErrnoException)?.code;
+      if (code === "ENOENT") {
+        exitUserError(err, "Check the skill path and --cases path exist.");
+        return;
+      }
+      exitInternalError(err);
+      return;
+    }
   }
+
+  // Unknown command
+  exitUserError(
+    `Unknown command: "${command}".`,
+    "Run `skillenhance --help` for the supported command list.",
+  );
 }
 
 // Only invoke when executed directly (not when imported by tests).
+// VITEST is the specific sentinel vitest sets in worker processes — checking
+// it alone lets `NODE_ENV=test` users still run the real CLI from a shell.
 // `process.argv[1]` is the entry script path.
 const isDirectInvoke =
+  process.env.VITEST !== "true" &&
   process.argv[1] &&
   (process.argv[1].endsWith("cli.ts") ||
     process.argv[1].endsWith("cli.js") ||
